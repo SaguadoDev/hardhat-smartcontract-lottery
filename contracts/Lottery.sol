@@ -3,11 +3,19 @@ pragma solidity ^0.8.8;
 
 import '@chainlink/contracts/src/v0.8/vrf/VRFConsumerBaseV2.sol';
 import '@chainlink/contracts/src/v0.8/vrf/interfaces/VRFCoordinatorV2Interface.sol';
+import '@chainlink/contracts/src/v0.8/automation/interfaces/AutomationCompatibleInterface.sol';
 
 error Raffle__NotEnoughETHEntered();
 error Raffle__TransferFailed();
+error Raffle__NotOpen();
 
-contract Raffle is VRFConsumerBaseV2 {
+contract Raffle is VRFConsumerBaseV2, AutomationCompatibleInterface {
+  /* Type declarations */
+  enum RaffleState {
+    OPEN,
+    CALCULATING
+  }
+
   /* State variables */
   uint256 private immutable i_entranceFee;
   address payable[] private s_players;
@@ -20,6 +28,9 @@ contract Raffle is VRFConsumerBaseV2 {
 
   // Raffle Variables
   address private s_recentWinner;
+  RaffleState private s_raffleState;
+  uint256 private s_lastTimeStamp;
+  uint256 private immutable i_interval;
 
   /* Events */
   event RaffleEnter(address indexed player);
@@ -31,18 +42,25 @@ contract Raffle is VRFConsumerBaseV2 {
     uint256 entranceFee,
     bytes32 gasLane,
     uint64 subscriptionId,
-    uint32 callbackGasLimit
+    uint32 callbackGasLimit,
+    uint256 interval
   ) VRFConsumerBaseV2(vrfCoordinatorV2) {
     i_entranceFee = entranceFee;
     i_vrfCoordinator = VRFCoordinatorV2Interface(vrfCoordinatorV2);
     i_gasLane = gasLane;
     i_subscriptionId = subscriptionId;
     i_callbackGasLimit = callbackGasLimit;
+    s_raffleState = RaffleState.OPEN;
+    s_lastTimeStamp = block.timestamp;
+    i_interval = interval;
   }
 
   function enterRaffle() public payable {
     if (msg.value < i_entranceFee) {
       revert Raffle__NotEnoughETHEntered();
+    }
+    if (s_raffleState != RaffleState.OPEN) {
+      revert Raffle__NotOpen();
     }
     s_players.push(payable(msg.sender));
     // Event when we update the players array
@@ -50,13 +68,28 @@ contract Raffle is VRFConsumerBaseV2 {
   }
 
   /**
-   * @dev
+   * @dev This is the function that the Chainlink Keeper nodes call
+   * they look for `upkeepNeeded` to return True.
+   * the following should be true for this to return true:
+   * 1. The time interval has passed between raffle runs.
+   * 2. The lottery is open.
+   * 3. The contract has ETH.
+   * 4. Implicity, your subscription is funded with LINK.
    */
-  function checkUpkeep() external {}
+  function checkUpkeep(
+    bytes calldata /* checkData */
+  ) public view override returns (bool upKeepNeeded, bytes memory /* performData */) {
+    bool isOpen = RaffleState.OPEN == s_raffleState;
+    bool timePassed = (block.timestamp - s_lastTimeStamp) > i_interval;
+    bool hasPlayers = s_players.length > 0;
+    bool hasBalance = address(this).balance > 0;
+    upKeepNeeded = isOpen && timePassed && hasPlayers && hasBalance;
+  }
 
   function requestRandomWinner() external {
     // Request the random number from the Chainlink VRF
     // Pick the winner
+    s_raffleState = RaffleState.CALCULATING;
     uint256 requestId = i_vrfCoordinator.requestRandomWords(
       i_gasLane,
       i_subscriptionId,
@@ -74,6 +107,8 @@ contract Raffle is VRFConsumerBaseV2 {
     uint256 indexOfWinner = randomWords[0] % s_players.length;
     address payable recentWinner = s_players[indexOfWinner];
     s_recentWinner = recentWinner;
+    s_raffleState = RaffleState.OPEN;
+    s_players = new address payable[](0);
     (bool success, ) = recentWinner.call{value: address(this).balance}('');
     if (!success) {
       revert Raffle__TransferFailed();
