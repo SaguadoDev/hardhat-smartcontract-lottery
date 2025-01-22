@@ -33,4 +33,13 @@ module.exports = {
       default: 1,
     },
   },
+  gasReporter: {
+    enabled: false,
+    outputFile: 'gas-report.txt',
+    noColors: true,
+    currency: 'USD',
+    coinmarketcap: COINMARKETCAP_API_KEY,
+    L1Etherscan: ETHERSCAN_API_KEY,
+    L1: 'ethereum', // L1 chain (default is ethereum)
+  },
 }
