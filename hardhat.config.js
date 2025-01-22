@@ -1,7 +1,9 @@
-require('dotenv').config()
+require('@nomicfoundation/hardhat-toolbox')
 require('hardhat-gas-reporter')
 require('solidity-coverage')
+require('hardhat-contract-sizer')
 require('hardhat-deploy')
+require('dotenv').config()
 
 const SEPOLIA_RPC_URL = process.env.SEPOLIA_RPC_URL || 'http://eth-sepolia'
 const SEPOLIA_PRIVATE_KEY = process.env.SEPOLIA_PRIVATE_KEY || '0xKey'
