@@ -51,7 +51,7 @@ const { assert, expect } = require('chai')
           await lottery.enterLottery({ value: lotteryEntranceFee })
           await network.provider.send('evm_increaseTime', [Number(interval) + 1])
           await network.provider.send('evm_mine')
-          await lottery.performUpkeep([])
+          await lottery.performUpkeep('0x')
           await expect(
             lottery.enterLottery({ value: lotteryEntranceFee }),
           ).to.be.revertedWithCustomError(lottery, 'Lottery__NotOpen')
