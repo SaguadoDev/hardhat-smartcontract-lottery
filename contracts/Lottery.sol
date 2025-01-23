@@ -92,7 +92,7 @@ contract Lottery is VRFConsumerBaseV2, AutomationCompatibleInterface {
     bool hasPlayers = s_players.length > 0;
     bool hasBalance = address(this).balance > 0;
     upkeepNeeded = timePassed && isOpen && hasBalance && hasPlayers;
-    return (upkeepNeeded, '0x0'); // can we comment this out?
+    return (upkeepNeeded, '0x0');
   }
 
   function performUpkeep(bytes calldata /* performData */) external override {
