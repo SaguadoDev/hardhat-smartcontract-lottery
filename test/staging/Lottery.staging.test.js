@@ -46,7 +46,6 @@ developmentChains.includes(network.name)
                 reject(error)
               }
             })
-            // Then entering the lottery
             console.log('Entering lottery...')
             const tx = await lottery.enterLottery({ value: lotteryEntranceFee })
             await tx.wait(1)
