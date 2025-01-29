@@ -7,15 +7,14 @@ This project demonstrates a decentralized lottery system using Hardhat, Solidity
 - `contracts/`: Contains the Solidity smart contracts.
 - `deploy/`: Deployment scripts for the smart contracts.
 - `test/`: Unit tests for the smart contracts.
-- `scripts/`: Scripts to interact with the deployed contracts.
 - `hardhat.config.js`: Hardhat configuration file.
+- `helper-hardhat-config.js`: Contains configuration settings and helper functions for Hardhat.
 - `package.json`: Project dependencies and scripts.
 
 ## Prerequisites
 
 - Node.js
 - pnpm
-- Hardhat
 
 ## Installation
 
