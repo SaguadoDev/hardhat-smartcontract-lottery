@@ -11,7 +11,7 @@ const ETHERSCAN_API_KEY = process.env.ETHERSCAN_API_KEY || 'key'
 const COINMARKETCAP_API_KEY = process.env.COINMARKETCAP_API_KEY || 'key'
 
 module.exports = {
-  solidity: '0.8.8',
+  solidity: '0.8.19',
   defaultNetwork: 'hardhat',
   networks: {
     hardhat: {
@@ -41,5 +41,8 @@ module.exports = {
     coinmarketcap: COINMARKETCAP_API_KEY,
     L1Etherscan: ETHERSCAN_API_KEY,
     L1: 'ethereum', // L1 chain (default is ethereum)
+  },
+  etherscan: {
+    apiKey: ETHERSCAN_API_KEY,
   },
 }

@@ -1,60 +1,48 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.8;
+pragma solidity ^0.8.19;
 
-import '@chainlink/contracts/src/v0.8/vrf/VRFConsumerBaseV2.sol';
-import '@chainlink/contracts/src/v0.8/vrf/interfaces/VRFCoordinatorV2Interface.sol';
-import '@chainlink/contracts/src/v0.8/automation/interfaces/AutomationCompatibleInterface.sol';
+import '@chainlink/contracts/src/v0.8/automation/AutomationCompatible.sol';
+
+import {VRFConsumerBaseV2Plus} from '@chainlink/contracts/src/v0.8/vrf/dev/VRFConsumerBaseV2Plus.sol';
+import {VRFV2PlusClient} from '@chainlink/contracts/src/v0.8/vrf/dev/libraries/VRFV2PlusClient.sol';
 
 error Lottery__NotEnoughETHEntered();
 error Lottery__TransferFailed();
 error Lottery__NotOpen();
-error Lottery__UpkeepNotNeeded(uint256 currentBalance, uint256 numPlayers, uint256 lotteryState);
 
-/**
- * @title Lottery contract
- * @author Sergio Aguado
- * @notice This contract is for creating an untamperable decentralized lottery system
- * @dev This contract uses Chainlink VRF v2 and Chainlink Keeper
- */
-contract Lottery is VRFConsumerBaseV2, AutomationCompatibleInterface {
-  /* Type declarations */
+contract Lottery is VRFConsumerBaseV2Plus, AutomationCompatibleInterface {
   enum LotteryState {
     OPEN,
-    CALCULATING
+    PENDING
   }
 
-  /* State variables */
-  uint256 private immutable i_entranceFee;
   address payable[] private s_players;
-  VRFCoordinatorV2Interface private immutable i_vrfCoordinator;
-  bytes32 private immutable i_gasLane;
-  uint64 private immutable i_subscriptionId;
-  uint16 private constant REQUEST_CONFIRMATIONS = 3;
-  uint32 private immutable i_callbackGasLimit;
-  uint32 private constant NUM_WORDS = 1;
-
-  // Lottery Variables
-  address private s_recentWinner;
+  address payable private s_recentWinner;
   LotteryState private s_lotteryState;
   uint256 private s_lastTimeStamp;
-  uint256 private immutable i_interval;
 
-  /* Events */
+  uint256 private immutable i_interval;
+  bytes32 private immutable i_gasLane;
+  uint256 private immutable i_entranceFee;
+  uint256 private immutable i_subscriptionId;
+  uint32 private immutable i_callbackGasLimit;
+
+  uint16 private constant REQUEST_CONFIRMATIONS = 3;
+  uint32 private constant NUM_WORDS = 1;
+
   event LotteryEnter(address indexed player);
   event RequestedLotteryWinner(uint256 indexed requestId);
   event WinnerPicked(address indexed winner);
 
-  /* Functions */
   constructor(
     address vrfCoordinatorV2,
     uint256 entranceFee,
     bytes32 gasLane,
-    uint64 subscriptionId,
+    uint256 subscriptionId,
     uint32 callbackGasLimit,
     uint256 interval
-  ) VRFConsumerBaseV2(vrfCoordinatorV2) {
+  ) VRFConsumerBaseV2Plus(vrfCoordinatorV2) {
     i_entranceFee = entranceFee;
-    i_vrfCoordinator = VRFCoordinatorV2Interface(vrfCoordinatorV2);
     i_gasLane = gasLane;
     i_subscriptionId = subscriptionId;
     i_callbackGasLimit = callbackGasLimit;
@@ -64,60 +52,40 @@ contract Lottery is VRFConsumerBaseV2, AutomationCompatibleInterface {
   }
 
   function enterLottery() public payable {
-    if (msg.value < i_entranceFee) {
-      revert Lottery__NotEnoughETHEntered();
-    }
-    if (s_lotteryState != LotteryState.OPEN) {
-      revert Lottery__NotOpen();
-    }
+    if (msg.value < i_entranceFee) revert Lottery__NotEnoughETHEntered();
+    if (s_lotteryState != LotteryState.OPEN) revert Lottery__NotOpen();
     s_players.push(payable(msg.sender));
-    // Event when we update the players array
     emit LotteryEnter(msg.sender);
   }
 
-  /**
-   * @dev This is the function that the Chainlink Keeper nodes call
-   * they look for `upkeepNeeded` to return True.
-   * the following should be true for this to return true:
-   * 1. The time interval has passed between lottery runs.
-   * 2. The lottery is open.
-   * 3. The contract has ETH.
-   * 4. Implicity, your subscription is funded with LINK.
-   */
   function checkUpkeep(
-    bytes memory /* checkData */
-  ) public view override returns (bool upkeepNeeded, bytes memory /* performData */) {
-    bool isOpen = LotteryState.OPEN == s_lotteryState;
-    bool timePassed = (block.timestamp - s_lastTimeStamp) > i_interval;
+    bytes calldata /** checkData*/
+  ) external view override returns (bool upkeepNeeded, bytes memory /* performData */) {
+    bool isOpen = (s_lotteryState == LotteryState.OPEN);
+    bool timePassed = ((block.timestamp - s_lastTimeStamp) > i_interval);
     bool hasPlayers = s_players.length > 0;
     bool hasBalance = address(this).balance > 0;
-    upkeepNeeded = timePassed && isOpen && hasBalance && hasPlayers;
-    return (upkeepNeeded, '0x0');
+    upkeepNeeded = isOpen && timePassed && hasPlayers && hasBalance;
   }
 
-  function performUpkeep(bytes calldata /* performData */) external override {
-    (bool upkeepNeeded, ) = checkUpkeep('');
-    if (!upkeepNeeded) {
-      revert Lottery__UpkeepNotNeeded(
-        address(this).balance,
-        s_players.length,
-        uint256(s_lotteryState)
-      );
-    }
-    s_lotteryState = LotteryState.CALCULATING;
-    uint256 requestId = i_vrfCoordinator.requestRandomWords(
-      i_gasLane,
-      i_subscriptionId,
-      REQUEST_CONFIRMATIONS,
-      i_callbackGasLimit,
-      NUM_WORDS
+  function performUpkeep(bytes calldata /** performData */) external override {
+    s_lotteryState = LotteryState.PENDING;
+    uint256 requestId = s_vrfCoordinator.requestRandomWords(
+      VRFV2PlusClient.RandomWordsRequest({
+        keyHash: i_gasLane,
+        subId: i_subscriptionId,
+        requestConfirmations: REQUEST_CONFIRMATIONS,
+        callbackGasLimit: i_callbackGasLimit,
+        numWords: NUM_WORDS,
+        extraArgs: VRFV2PlusClient._argsToBytes(VRFV2PlusClient.ExtraArgsV1({nativePayment: false}))
+      })
     );
     emit RequestedLotteryWinner(requestId);
   }
 
   function fulfillRandomWords(
-    uint256 /* requestId */,
-    uint256[] memory randomWords
+    uint256 /** requestId */,
+    uint256[] calldata randomWords
   ) internal override {
     uint256 indexOfWinner = randomWords[0] % s_players.length;
     address payable recentWinner = s_players[indexOfWinner];
@@ -129,10 +97,8 @@ contract Lottery is VRFConsumerBaseV2, AutomationCompatibleInterface {
     if (!success) {
       revert Lottery__TransferFailed();
     }
-    emit WinnerPicked(recentWinner);
   }
 
-  /* Getters */
   function getEntranceFee() public view returns (uint256) {
     return i_entranceFee;
   }
@@ -157,7 +123,7 @@ contract Lottery is VRFConsumerBaseV2, AutomationCompatibleInterface {
     return s_players.length;
   }
 
-  function getLatestTimeStamp() public view returns (uint256) {
+  function getLastestTimeStamp() public view returns (uint256) {
     return s_lastTimeStamp;
   }
 
@@ -167,5 +133,9 @@ contract Lottery is VRFConsumerBaseV2, AutomationCompatibleInterface {
 
   function getInterval() public view returns (uint256) {
     return i_interval;
+  }
+
+  function getSubscriptionId() public view returns (uint256) {
+    return i_subscriptionId;
   }
 }
