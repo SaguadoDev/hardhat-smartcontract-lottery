@@ -51,7 +51,7 @@ pnpm hardhat compile
 ### Deploy the Contracts
 
 ```bash
-pnpm hardhat deploy --network <network-name>
+pnpm hardhat deploy --network sepolia
 ```
 
 ### Run Tests
