@@ -17,9 +17,10 @@ developmentChains.includes(network.name)
       })
 
       describe('fulfillRandomWords', function () {
+        this.timeout(120000)
         it('works with live Chainlink Keepers and Chainlink VRF, we get a random winner', async function () {
           console.log('Setting up test...')
-          const startingTimeStamp = await lottery.getLatestTimeStamp()
+          const startingTimeStamp = await lottery.getLastestTimeStamp()
           const accounts = await ethers.getSigners()
 
           console.log('Setting up Listener...')
@@ -30,7 +31,7 @@ developmentChains.includes(network.name)
                 const recentWinner = await lottery.getRecentWinner()
                 const lotteryState = await lottery.getLotteryState()
                 const winnerEndingBalance = await accounts[0].getBalance()
-                const endingTimeStamp = await lottery.getLatestTimeStamp()
+                const endingTimeStamp = await lottery.getLastestTimeStamp()
 
                 await expect(lottery.getPlayer(0)).to.be.reverted
                 assert.equal(recentWinner.toString(), accounts[0].address)
