@@ -1,6 +1,6 @@
 # Hardhat Smart Contract Lottery
 
-This project demonstrates a decentralized lottery system using Hardhat, Solidity, and Chainlink VRF (Verifiable Random Function) and Chainlink Keepers.
+This project demonstrates a decentralized lottery system using Hardhat, Solidity, and Chainlink VRF and Chainlink Keepers.
 
 ## Project Structure
 
